@@ -1,15 +1,25 @@
-#Question 1
+---
+title: "732A91 Lab 3"
+author: "Fanny Karelius (fanka300), Milda Poceviciute (milpo192)"
+date: "3 maj 2018"
+output: html_document
+---
 
-rain<-read.table("Rainfall.dat",header=FALSE)
-data <- rain
+#Question 1: Normal model, mixture of normal model with semi-conjugate prior
 
-#a) Normal model:
-mu0<-0
-tau20 <-50
-nu0 <-5
-sigma20 <-20
+##a) Normal model
 
+The daily precipitation $y=\{y_1,...,y_n\}$ is assumed to be independently normally distributed, $y|\mu,\sigma^2\sim N(\mu,\sigma^2)$, where $\mu,\sigma^2$ are unknown. The priors $\mu\sim N(\mu_0,\tau_0^2)$ and $\sigma^2\sim Inv-\chi^2(\nu_0,\sigma_0^2)$ are independent.
+The conditional posteriors are
+$$\mu|\sigma^2,y\sim N(\mu_n,\tau_n^2)$$
+and
+$$\sigma^2|\mu,y\sim Inv-\chi^2(\nu_n,\frac{\nu_0\sigma_0^2+\sum_{i=1}^n(y_i-\mu)^2}{\nu_0+n})$$
+where $\mu_n=w\bar{y}+(1-w)\mu_0$, $w=\frac{n/\sigma^2}{\frac{n}{\sigma^2}+\frac{1}{\tau_0^2}}$, $\frac{1}{\tau_n^2}=\frac{n}{\sigma^2}+\frac{1}{\tau_0^2}$ and $\nu_n=\nu_0+n$.
 
+###i)
+
+Gibbs sampling implementation:
+```{r}
 gibbs_sampler <- function(iter, data, mu0, tau20, nu0, sigma20){
   N <- nrow(data)
   x_bar <- mean(data$V1)
@@ -32,24 +42,41 @@ gibbs_sampler <- function(iter, data, mu0, tau20, nu0, sigma20){
   }
   results
 }
+```
+
+
+###ii)
+```{r}
+rain<-read.table("D:/LiU/732A91/Bayesian_lab3/Rainfall.dat",header=FALSE)
+
+mu0<-0
+tau20 <-50
+nu0 <-5
+sigma20 <-20
+
 burn_in <- 100
 n <- 1000
 rain_gibbs<-gibbs_sampler(n,rain, mu0, tau20, nu0, sigma20)
 rain_gibbs <- as.data.frame(rain_gibbs)
 
+post_mu <- mean(rain_gibbs$mu[burn_in:n])
+post_sigma2 <- mean(rain_gibbs$sigma2[burn_in:n])
+```
+
+```{r,echo=FALSE}
 plot(rain_gibbs$sigma2[burn_in:n], xaxt="n",type="l", xlab="Iteration", ylab="sigma2", main ="Gibbs sampling of sigma2")
 axis(1, at=seq(0,(n-burn_in), by=50), labels=seq(burn_in,n, by=50))
+```
+
+```{r,echo=FALSE}
 plot(rain_gibbs$mu[burn_in:n], xaxt="n", type="l", xlab="Iteration", ylab="mu", main ="Gibbs sampling of mu")
 axis(1, at=seq(0,(n-burn_in), by=50), labels=seq(burn_in,n, by=50))
 
-post_mu <- mean(rain_gibbs$mu[burn_in:n])
-post_sigma2 <- mean(rain_gibbs$sigma2[burn_in:n])
+```
 
+##b) Mixture normal model
 
-####### b) Mixture normal model
-
-# Data options
-
+```{r}
 rawData <- rain
 x <- as.matrix(rawData)
 
@@ -66,10 +93,6 @@ nu0 <- rep(4,nComp) # degrees of freedom for prior on sigma2
 # MCMC options
 nIter <- 1000 # Number of Gibbs sampling draws
 
-# Plotting options
-plotFit <- TRUE
-# lineColors <- c("blue", "green", "magenta", 'yellow')
-# sleepTime <- 0.1 # Adding sleep time between iterations for plotting
 ################   END USER INPUT ###############
 
 ###### Defining a function that simulates from the 
@@ -118,7 +141,6 @@ for (k in 1:nIter){
   #message(paste('Iteration number:',k))
   alloc <- S2alloc(S) # Just a function that converts between different representations of the group allocations
   nAlloc <- colSums(S)
-  #print(nAlloc)
   # Update components probabilities
   pi <- rDirichlet(alpha + nAlloc)
   
@@ -146,35 +168,28 @@ for (k in 1:nIter){
     S[i,] <- t(rmultinom(1, size = 1 , prob = probObsInComp/sum(probObsInComp)))
   }
   
-  # Printing the fitted density against data histogram
-   if (plotFit && (k%%1 ==0)){
-     effIterCount <- effIterCount + 1
-  #   hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = paste("Iteration number",k), ylim = ylim)
-     mixDens <- rep(0,length(xGrid))
-  #   components <- c()
-  for (j in 1:nComp){
-       compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
-       mixDens <- mixDens + pi[j]*compDens
-  #     lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
-  #     components[j] <- paste("Component ",j)
-  #   }
-  mixDensMean <- ((effIterCount-1)*mixDensMean + mixDens)/effIterCount
-  #   
-  #   lines(xGrid, mixDens, type = "l", lty = 2, lwd = 3, col = 'red')
-  #   legend("topleft", box.lty = 1, legend = c("Data histogram",components, 'Mixture'), 
-  #          col = c("black",lineColors[1:nComp], 'red'), lwd = 2)
-  #   Sys.sleep(sleepTime)
-   }
-  
-   }
-  
 }
 
 hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
 lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
 lines(xGrid, dnorm(xGrid, mean = post_mu, sd = sqrt(post_sigma2)), type = "l", lwd = 2, col = "blue")
 legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density from a)"), col=c("black","red","blue"), lwd = 2)
+```
 
-#########################    Helper functions    ##############################################
+##c)
 
 
+#Question 2: Time series models in Stan
+
+##a)
+
+##b)
+
+##c)
+
+##d)
+
+
+#Appendix
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
