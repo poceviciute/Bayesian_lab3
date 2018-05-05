@@ -5,16 +5,12 @@ library(rstan)
 ar_process = '
 data {
   int<lower=0> iter;
-  real<lower=0> sigma2;
-  real<lower=-1, upper=1> phi;
-  real mu;
-}
-transformed data {
-  real x[iter];
-  x[1] = mu;
 }
 parameters {
-  real epsilon;
+  real mu;
+  real<lower=0> sigma2;
+  real<lower=-1, upper=1> phi;
+  real x[iter];
 }
 model {
   for(i in 2:iter){
@@ -22,10 +18,17 @@ model {
   }
 }'
 
-burnin = 100
-niter = 200
+burnin <- 100
+niter <- 200
+mu <- 10
+init_para <- list(list(sigma2=2, phi=0.5, mu=10, x=c(mu,rep(0,niter-1))))
+#needs to be a list of a list since each chain needs its own list
 fit1<-stan(model_code=ar_process,
-           data=list(iter=200, sigma2=2, phi=0.5, mu=10),
+           data=list(iter=niter),
+           init = init_para,
            warmup=burnin,
            iter=niter,
-           chains=1)
+           chains = 1)
+print(fit1)
+fit1_postmean <- get_posterior_mean(fit1)[5:niter]
+plot(fit1_postmean, type="l")
