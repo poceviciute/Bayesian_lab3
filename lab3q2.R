@@ -31,4 +31,5 @@ fit1<-stan(model_code=ar_process,
            chains = 1)
 print(fit1)
 fit1_postmean <- get_posterior_mean(fit1)[burnin:niter]
-plot(fit1_postmean, type="l")
+plot(fit1_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean of AR(1) process")
+axis(1, at=seq(0,(n-burn_in), by=10), labels=seq(burn_in,n, by=10))
