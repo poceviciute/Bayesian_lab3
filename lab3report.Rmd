@@ -2,7 +2,9 @@
 title: "732A91 Lab 3"
 author: "Fanny Karelius (fanka300), Milda Poceviciute (milpo192)"
 date: "3 maj 2018"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 #Question 1: Normal model, mixture of normal model with semi-conjugate prior
@@ -47,8 +49,9 @@ gibbs_sampler <- function(iter, data, mu0, tau20, nu0, sigma20){
 
 ###ii)
 ```{r}
-rain<-read.table("D:/LiU/732A91/Bayesian_lab3/Rainfall.dat",header=FALSE)
+rain<-read.table("Rainfall.dat",header=FALSE)
 
+# Weakly informative priors based on our guesses about the possible paramter values
 mu0 <-0
 tau20 <-50
 nu0 <-5
@@ -316,12 +319,25 @@ The correlation between $x_t$ and $x_{t+h}$ is $\rho_h=\phi^h$, which means that
 
 ##b)
 
-Using the function in a) we simulate two AR(1)-processes $x_{1:T}$ with $\phi=0.3$ and $y_{1:T}$ with $\phi=0.95$. Then we estimate values of $\phi$, $\mu$ and $\sigma^2$ for these two processes using MCMC. The non-informative priors used were 
+Using the function in a) we simulate two AR(1)-processes $x_{1:T}$ with $\phi=0.3$ and $y_{1:T}$ with $\phi=0.95$. Then we estimate values of $\phi$, $\mu$ and $\sigma^2$ for these two processes using MCMC. The non-informative priors used were:
+\newline
+$\mu \sim N(0,10)$
+\newline
+$\sigma \sim Exp(0.1)$
+\newline
+$\phi \sim N(0,1)$
+\newline
+The priors were chosen so they would cover a wide range of values as well as the values that were used in generating AR(1)-process $x_{1:T}$ data.
 
 ###i)
 
-```{r}
+```{r, warning=FALSE, error=FALSE}
 #b)
+
+burnin <- 101
+niter <- 300
+mu <- 10
+init_para <- list(list(x=c(mu,rep(0,niter-1))))
 
 xT <- stan(model_code=ar_process,
            data=list(iter=niter,sigma2=2, phi=0.3, mu=10),
@@ -352,9 +368,11 @@ parameters {
   real<lower=-1, upper=1> phi;
 }
 model {
-  mu ~ uniform(0,20);
-  sigma ~ uniform(0,5);
+// Priors
+  mu ~ normal(0,10);
+  sigma ~ exponential(0.1); //very weak prior for sigma, but always postive
   phi ~ normal(0, 1);
+// model
   for(i in 2:iter){
     x[i] ~ normal(mu + phi*(x[i-1]-mu), sigma);
   }
@@ -370,15 +388,14 @@ xT_fit <- stan(model_code=ar_mcmc,
            warmup=burnin,
            iter=niter,
            chains = 1,
-           seed = 123456,
-           control = list(max_treedepth = 15,adapt_delta = 0.8))
+           control = list(max_treedepth = 15,adapt_delta = 0.99))
 
 #pairs(xT_fit)
 
-para_postmean <- get_posterior_mean(xT_fit)[burnin:niter]
-mu_post2 <- extract(xT_fit)$mu[burnin:niter]
-phi_post2 <- extract(xT_fit)$phi[burnin:niter]
-sigma2_post2 <- extract(xT_fit)$sigma2[burnin:niter]
+para_postmean <- get_posterior_mean(xT_fit)[1:3]
+mu_post2 <- extract(xT_fit)$mu
+phi_post2 <- extract(xT_fit)$phi
+sigma2_post2 <- (extract(xT_fit)$sigma)^2
 
 perc1x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.025)[1:3]
 perc2x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.975)[1:3]
@@ -390,20 +407,24 @@ cat("Posterior means for mu, sigma2, phi: ", c(mean(mu_post2), mean(sigma2_post2
 cat("\n Upper limits for 95% credible interval: ", perc2x)
 cat("\n Lower limits for 95% credible interval: ", perc1x)
 cat("\n Number of effective posterior samples: ", n_eff_x)
+
 ```
 
-```{r, warning=FALSE}
+From the simulations above we get quite close estimates for $\mu$. The estimate for $\sigma^2$ is much lower than the value used in part a). It seems to be highly influenced by the sample variance of the $x_{1:T}$ data, which is `r var(xT_postmean)`. The 95% credible interval of $\phi$ does not include the value of 0.3, hence the estimation of the $\phi$ seems to be poor as well.
+
+
+```{r, warning=FALSE, error=FALSE}
 yT_fit <- stan(model_code=ar_mcmc,
                data=list(iter=ndraws,x=yT_postmean),
                warmup=burnin,
                iter=niter,
                chains = 1)
 
-Ypara_postmean <- get_posterior_mean(yT_fit)[burnin:niter]
+Ypara_postmean <- get_posterior_mean(yT_fit)[1:3]
 
-mu_post <- extract(yT_fit)$mu[burnin:niter]
-phi_post <- extract(yT_fit)$phi[burnin:niter]
-sigma2_post <- extract(yT_fit)$sigma2[burnin:niter]
+mu_post <- extract(yT_fit)$mu
+phi_post <- extract(yT_fit)$phi
+sigma2_post <- (extract(yT_fit)$sigma)^2
 
 perc1y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.025)[1:3]
 perc2y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.975)[1:3]
@@ -417,7 +438,32 @@ cat("\n Lower limits for 95% credible interval: ", perc1y)
 cat("\n Number of effective posterior samples: ", n_eff_y)
 ```
 
+From the simulations above we get quite close estimates for $\mu$ and $\phi$. However,the estimate for $\sigma^2$ is much lower than the value used in part a). It seems to be highly influenced by the sample variance of the $y_{1:T}$ data, which is `r var(yT_postmean)`.
+ 
+
 ###ii)
+
+```{r}
+# Trajectory plots of the mu 
+plot(mu_post2, type='l')
+
+plot(mu_post, type='l')
+
+# Trajectory plots of the sigma2
+
+plot(sigma2_post2, type='l')
+
+plot(sigma2_post, type='l')
+
+# Trajectory plots of the phi
+
+plot(phi_post2, type='l')
+
+plot(phi_post, type='l')
+```
+
+The trajectory plots of $\mu$, $\sigma^2$ and $\phi$ seem to have some correlation between the iterations, however they do not have a tendency to get stuck at certain values for a number of iterations. 
+
 
 ```{r}
 plot(mu_post2, phi_post2, pch=19, xlab="mu", ylab="phi", main="Joint posterior of mu and phi for x")
@@ -425,11 +471,104 @@ plot(mu_post2, phi_post2, pch=19, xlab="mu", ylab="phi", main="Joint posterior o
 plot(mu_post, phi_post, pch=19, xlab="mu", ylab="phi", main="Joint posterior of mu and phi for y")
 ```
 
+From the plots above, we can see that the joint posterior with data $x_{1:T}$ is highly correlated. The joint posterior with data $y_{1:T}$ also has some trend in it, but at a small scale.
 
 ##c)
 
+The number of infections $c_t$ at each time point follows an independent Poisson distribution, when conditioned on a latent AR(1)-process $x_t$:
+
+$$c_t|x_t \sim Poisson(\exp(x_t)) $$
+We are interested in estimating the latent intensity given by $\theta_t = \exp(x_t)$ over time.
+
+The non-informative priors used were:
+\newline
+$\mu \sim N(0,10)$
+\newline
+$\sigma \sim Exp(1)$
+\newline
+$\phi \sim N(0,0.5)$
+\newline
+The priors were chosen so they would cover a wide range of values as well as the values that were used in generating AR(1)-process $x_{1:T}$ data.
+
+```{r}
+campy<-read.table("Campy.dat",header=TRUE)
+
+campy_model = '
+data {
+  int<lower=0> iter;
+  int c[iter];
+  real<lower=1> lambda;
+}
+parameters {
+  real mu;
+  real<lower=0> sigma;
+  real<lower=-1, upper=1> phi;
+  real x[iter];
+}
+
+model {
+  phi ~ normal(0,0.5);
+  sigma ~ exponential(1);
+  mu ~ normal(0,10);
+  for(i in 2:iter){
+    x[i] ~ normal(mu + phi*(x[i-1]-mu), sigma/lambda);
+    c[i] ~ poisson(exp(x[i]));
+  }
+    
+}'
+
+c_fit <- stan(model_code=campy_model,
+                     data=list(iter=140,c=campy$c, lambda=1),
+                     warmup=30,
+                     iter=140,
+                     chains = 1)
+
+print(c_fit)
+theta <- exp(get_posterior_mean(c_fit))[4:143]
+perc1 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.025))
+perc2 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.975))
+plot(theta, type="l", main="Campy c)")
+lines(campy$c, col="red")
+lines(perc1, col="blue")
+lines(perc2, col="blue")
+legend(x = 5, y=45, c("Data", "Theta", "95% CI"), col=c("red", "black", "blue"), lwd = 3)
+
+```
+
+
+The posterior mean of $\theta_t$ follows the general trend in the Campy data quite well. 95% credible interval seems to include majority of the data points.
+
+
 ##d)
 
+Now we assume we have a belief that the prior of $\sigma^2$ should be smoother. Therefore, we use a shrinkage constants $\lambda$ to reduce $\epsilon_t$ value for each given time.
+
+```{r}
+d_fit <- stan(model_code=campy_model,
+              data=list(iter=140,c=campy$c, lambda=100),
+              warmup=30,
+              iter=140,
+              chains = 1)
+
+print(d_fit)
+theta2 <- exp(get_posterior_mean(d_fit))[4:143]
+perc1d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.025))
+perc2d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.975))
+plot(theta2, type="l", main="Campy d)")
+lines(campy$c, col="red")
+lines(perc1d, col="blue")
+lines(perc2d, col="blue")
+legend(x = 5, y=40, c("Data", "Theta", "95% CI"), col=c("red", "black", "blue"), lwd = 3)
+
+#Comparison:
+plot(theta, type="l", main="Comparison c) and d)")
+lines(theta2, col="red")
+legend(x = 5, y=45, c("Theta c)", "Theta d)"), col=c("black", "red"), lwd = 3)
+
+
+```
+
+The posterior mean of $\theta_t$ in part d) does seem to be a bit smoother with shrinkage constant $\lambda = 100$, but the overall performance is a bit worse. That is, the 95% credible interval includes less values of the Campy data in comparison to part c).
 
 #Appendix
 ```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
