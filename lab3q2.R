@@ -182,13 +182,14 @@ c_fit <- stan(model_code=campy_model,
                      chains = 1)
 
 print(c_fit)
-theta <- exp(get_posterior_mean(c_fit))[4:140]
-perc1 <- exp(sapply(as.data.frame(c_fit)[,4:140], FUN=quantile, probs=0.025))
-perc2 <- exp(sapply(as.data.frame(c_fit)[,4:140], FUN=quantile, probs=0.975))
+theta <- exp(get_posterior_mean(c_fit))[4:143]
+perc1 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.025))
+perc2 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.975))
 plot(theta, type="l", main="Campy c)")
 lines(campy$c, col="red")
 lines(perc1, col="blue")
 lines(perc2, col="blue")
+legend(x = 5, y=45, c("Data", "Theta", "95% CI"), col=c("red", "black", "blue"), lwd = 3)
 #extract(c_fit)
 
 
@@ -201,13 +202,15 @@ d_fit <- stan(model_code=campy_model,
               chains = 1)
 
 print(d_fit)
-theta2 <- exp(get_posterior_mean(d_fit))[4:140]
-perc1d <- exp(sapply(as.data.frame(d_fit)[,4:140], FUN=quantile, probs=0.025))
-perc2d <- exp(sapply(as.data.frame(d_fit)[,4:140], FUN=quantile, probs=0.975))
+theta2 <- exp(get_posterior_mean(d_fit))[4:143]
+perc1d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.025))
+perc2d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.975))
 plot(theta2, type="l", main="Campy d)")
 lines(campy$c, col="red")
 lines(perc1d, col="blue")
 lines(perc2d, col="blue")
+legend(x = 5, y=40, c("Data", "Theta", "95% CI"), col=c("red", "black", "blue"), lwd = 3)
 
 plot(theta, type="l", main="Comparison c) and d)")
 lines(theta2, col="red")
+legend(x = 5, y=45, c("Theta c)", "Theta d)"), col=c("black", "red"), lwd = 3)
