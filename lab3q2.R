@@ -102,9 +102,9 @@ parameters {
   real<lower=-1, upper=1> phi;
 }
 model {
-  mu ~ uniform(0,20);
-  sigma ~ uniform(0,5);
-  phi ~ normal(0, 1);
+  phi ~ normal(0,1);
+  sigma ~ exponential(0.1);
+  mu ~ normal(0,10);
   for(i in 2:iter){
     x[i] ~ normal(mu + phi*(x[i-1]-mu), sigma);
   }
@@ -114,7 +114,7 @@ model {
 burnin <- 100
 niter <- 300
 ndraws <- 200
-#init_prior <- list(list(mu=0, phi=0.5, sigma=2))
+#init_prior <- list(list(mu=10, phi=0.5, sigma=1))
 
 xT_fit <- stan(model_code=ar_mcmc,
            data=list(iter=ndraws,x=xT_postmean),
@@ -122,9 +122,10 @@ xT_fit <- stan(model_code=ar_mcmc,
            iter=niter,
            chains = 1)
 print(xT_fit)
-para_postmean <- get_posterior_mean(xT_fit)[burnin:niter]
-mu_post2 <- extract(xT_fit)$mu[burnin:niter]
-phi_post2 <- extract(xT_fit)$phi[burnin:niter]
+para_postmean <- get_posterior_mean(xT_fit)[1:3]
+mu_post2 <- extract(xT_fit)$mu
+phi_post2 <- extract(xT_fit)$phi
+sigma2_post2 <- (extract(xT_fit)$sigma)^2
 plot(mu_post2, phi_post2, pch=19, xlab="mu", ylab="phi", main="Joint posterior of mu and phi for x")
 perc1x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.025)[1:3]
 perc2x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.975)[1:3]
@@ -136,33 +137,37 @@ yT_fit <- stan(model_code=ar_mcmc,
                iter=niter,
                chains = 1)
 print(yT_fit)
-Ypara_postmean <- get_posterior_mean(yT_fit)[burnin:niter]
+Ypara_postmean <- get_posterior_mean(yT_fit)[1:3]
 
-mu_post <- extract(yT_fit)$mu[burnin:niter]
-phi_post <- extract(yT_fit)$phi[burnin:niter]
+mu_post <- extract(yT_fit)$mu
+phi_post <- extract(yT_fit)$phi
+sigma2_post <- (extract(yT_fit)$sigma)^2
 plot(mu_post, phi_post, pch=19, xlab="mu", ylab="phi", main="Joint posterior of mu and phi for y")
 perc1y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.025)[1:3]
 perc2y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.975)[1:3]
 n_eff_y<- summary(yT_fit)$summary[,"n_eff"][1:3]
+
 #c)
 
 campy<-read.table("D:/LiU/732A91/Bayesian_lab3/Campy.dat",header=TRUE)
-
 
 campy_model = '
 data {
   int<lower=0> iter;
   int c[iter];
-  real mu;
-  real<lower=0> sigma;
   real<lower=1> lambda;
-  real<lower=-1, upper=1> phi;
 }
 parameters {
+  real mu;
+  real<lower=0> sigma;
+  real<lower=-1, upper=1> phi;
   real x[iter];
 }
 
 model {
+  phi ~ normal(0,0.5);
+  sigma ~ exponential(1);
+  mu ~ normal(0,10);
   for(i in 2:iter){
     x[i] ~ normal(mu + phi*(x[i-1]-mu), sigma/lambda);
     c[i] ~ poisson(exp(x[i]));
@@ -171,38 +176,38 @@ model {
 }'
 
 c_fit <- stan(model_code=campy_model,
-                     data=list(iter=140,c=campy$c, phi=0.5, sigma=sqrt(2), lambda=1, mu=10),
+                     data=list(iter=140,c=campy$c, lambda=1),
                      warmup=30,
                      iter=140,
                      chains = 1)
 
 print(c_fit)
-theta <- exp(get_posterior_mean(c_fit))
-perc1 <- exp(sapply(as.data.frame(c_fit), FUN=quantile, probs=0.025))
-perc2 <- exp(sapply(as.data.frame(c_fit), FUN=quantile, probs=0.975))
-plot(theta, type="l", main="Campy")
+theta <- exp(get_posterior_mean(c_fit))[4:140]
+perc1 <- exp(sapply(as.data.frame(c_fit)[,4:140], FUN=quantile, probs=0.025))
+perc2 <- exp(sapply(as.data.frame(c_fit)[,4:140], FUN=quantile, probs=0.975))
+plot(theta, type="l", main="Campy c)")
 lines(campy$c, col="red")
 lines(perc1, col="blue")
 lines(perc2, col="blue")
-extract(c_fit)
+#extract(c_fit)
 
 
 #d)
 
 d_fit <- stan(model_code=campy_model,
-              data=list(iter=140,c=campy$c, phi=0.5, sigma=sqrt(2), lambda=3, mu=10),
+              data=list(iter=140,c=campy$c, lambda=100),
               warmup=30,
               iter=140,
               chains = 1)
 
 print(d_fit)
-theta2 <- exp(get_posterior_mean(d_fit))
-perc1d <- exp(sapply(as.data.frame(d_fit), FUN=quantile, probs=0.025))
-perc2d <- exp(sapply(as.data.frame(d_fit), FUN=quantile, probs=0.975))
-plot(theta2, type="l", main="Campy")
+theta2 <- exp(get_posterior_mean(d_fit))[4:140]
+perc1d <- exp(sapply(as.data.frame(d_fit)[,4:140], FUN=quantile, probs=0.025))
+perc2d <- exp(sapply(as.data.frame(d_fit)[,4:140], FUN=quantile, probs=0.975))
+plot(theta2, type="l", main="Campy d)")
 lines(campy$c, col="red")
 lines(perc1d, col="blue")
 lines(perc2d, col="blue")
 
-plot(theta, type="l")
+plot(theta, type="l", main="Comparison c) and d)")
 lines(theta2, col="red")
