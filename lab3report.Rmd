@@ -22,7 +22,7 @@ Gibbs sampling implementation:
 ```{r}
 gibbs_sampler <- function(iter, data, mu0, tau20, nu0, sigma20){
   N <- nrow(data)
-  x_bar <- mean(data$V1)
+  x_bar <- mean(data[,1])
   nun <- nu0+N
   mu <- rnorm(1,mu0, sqrt(tau20))
   sigma2 <- nu0*sigma20/rchisq(1,nu0)
@@ -49,14 +49,14 @@ gibbs_sampler <- function(iter, data, mu0, tau20, nu0, sigma20){
 ```{r}
 rain<-read.table("D:/LiU/732A91/Bayesian_lab3/Rainfall.dat",header=FALSE)
 
-mu0<-0
+mu0 <-0
 tau20 <-50
 nu0 <-5
 sigma20 <-20
 
 burn_in <- 100
 n <- 1000
-rain_gibbs<-gibbs_sampler(n,rain, mu0, tau20, nu0, sigma20)
+rain_gibbs <- gibbs_sampler(n, rain, mu0, tau20, nu0, sigma20)
 rain_gibbs <- as.data.frame(rain_gibbs)
 
 post_mu <- mean(rain_gibbs$mu[burn_in:n])
@@ -65,7 +65,7 @@ post_sigma2 <- mean(rain_gibbs$sigma2[burn_in:n])
 
 ```{r,echo=FALSE}
 plot(rain_gibbs$sigma2[burn_in:n], xaxt="n",type="l", xlab="Iteration", ylab="sigma2", main ="Gibbs sampling of sigma2")
-axis(1, at=seq(0,(n-burn_in), by=50), labels=seq(burn_in,n, by=50))
+axis(1, at=seq(0, (n-burn_in), by=50), labels=seq(burn_in, n, by=50))
 ```
 
 ```{r,echo=FALSE}
@@ -74,9 +74,11 @@ axis(1, at=seq(0,(n-burn_in), by=50), labels=seq(burn_in,n, by=50))
 
 ```
 
+The plots of the trajectories of the sampled Markov chains of $\sigma^2$ and $\mu$ seem to be converging well. The Gibbs sampling takes large steps from iteration to iteration and the values does not appear to be (highly) correlated.
+
 ##b) Mixture normal model
 
-```{r}
+```{r, results='hide', fig.keep='none'}
 rawData <- rain
 x <- as.matrix(rawData)
 
@@ -128,8 +130,10 @@ S2alloc <- function(S){
 # Initial value for the MCMC
 nObs <- length(x)
 S <- t(rmultinom(nObs, size = 1 , prob = rep(1/nComp,nComp))) # nObs-by-nComp matrix with component allocations.
-mu <- quantile(x, probs = seq(0,1,length = nComp))
-sigma2 <- rep(var(x),nComp)
+mu <- matrix(ncol=nComp, nrow=nIter+1)
+mu[1,] <- quantile(x, probs = seq(0,1,length = nComp))
+sigma2 <- matrix(ncol=nComp, nrow=nIter+1)
+sigma2[1,] <- rep(var(x),nComp)
 probObsInComp <- rep(NA, nComp)
 
 # Setting up the plot
@@ -138,7 +142,8 @@ xGridMin <- min(xGrid)
 xGridMax <- max(xGrid)
 mixDensMean <- rep(0,length(xGrid))
 effIterCount <- 0
-ylim <- c(0,2*max(hist(x)$density))
+hist_x <- max(invisible(hist(x)$density))
+ylim <- c(0,2*hist_x)
 
 
 for (k in 1:nIter){
@@ -152,23 +157,23 @@ for (k in 1:nIter){
   # Update mu's
   for (j in 1:nComp){
     precPrior <- 1/tau2Prior[j]
-    precData <- nAlloc[j]/sigma2[j]
+    precData <- nAlloc[j]/sigma2[k,j]
     precPost <- precPrior + precData
     wPrior <- precPrior/precPost
     muPost <- wPrior*muPrior + (1-wPrior)*mean(x[alloc == j])
     tau2Post <- 1/precPost
-    mu[j] <- rnorm(1, mean = muPost, sd = sqrt(tau2Post))
+    mu[k+1,j] <- rnorm(1, mean = muPost, sd = sqrt(tau2Post))
   }
   
   # Update sigma2's
   for (j in 1:nComp){
-    sigma2[j] <- rScaledInvChi2(1, df = nu0[j] + nAlloc[j], scale = (nu0[j]*sigma2_0[j] + sum((x[alloc == j] - mu[j])^2))/(nu0[j] + nAlloc[j]))
+    sigma2[k+1,j] <- rScaledInvChi2(1, df = nu0[j] + nAlloc[j], scale = (nu0[j]*sigma2_0[j] + sum((x[alloc == j] - mu[k+1,j])^2))/(nu0[j] + nAlloc[j]))
   }
   
   # Update allocation
   for (i in 1:nObs){
     for (j in 1:nComp){
-      probObsInComp[j] <- pi[j]*dnorm(x[i], mean = mu[j], sd = sqrt(sigma2[j]))
+      probObsInComp[j] <- pi[j]*dnorm(x[i], mean = mu[k+1,j], sd = sqrt(sigma2[k+1,j]))
     }
     S[i,] <- t(rmultinom(1, size = 1 , prob = probObsInComp/sum(probObsInComp)))
   }
@@ -180,7 +185,7 @@ for (k in 1:nIter){
      mixDens <- rep(0,length(xGrid))
   #   components <- c()
   for (j in 1:nComp){
-       compDens <- dnorm(xGrid,mu[j],sd = sqrt(sigma2[j]))
+       compDens <- dnorm(xGrid,mu[k+1,j],sd = sqrt(sigma2[k+1,j]))
        mixDens <- mixDens + pi[j]*compDens
   #     lines(xGrid, compDens, type = "l", lwd = 2, col = lineColors[j])
   #     components[j] <- paste("Component ",j)
@@ -196,7 +201,24 @@ for (k in 1:nIter){
    }
   
 }
+```
 
+```{r}
+for(i in 1:nComp){
+  plot(mu[50:nIter,i], xlab="Iteration", ylab="mu", main=paste0("mu ", i), type="l")
+}
+
+for(i in 1:nComp){
+  plot(sigma2[50:nIter,i], xlab="Iteration", ylab="sigma2", main=paste0("sigma2 ", i), type="l")
+}
+```
+
+From the trajectory plots above we conclude that the $\mu$s and $\sigma^2$s of both components do not appear to converge well. The iterations seem to be correlated.
+
+
+##c)
+
+```{r}
 hist(x, breaks = 20, freq = FALSE, xlim = c(xGridMin,xGridMax), main = "Final fitted density")
 lines(xGrid, mixDensMean, type = "l", lwd = 2, lty = 4, col = "red")
 lines(xGrid, dnorm(xGrid, mean = post_mu, sd = sqrt(post_sigma2)), type = "l", lwd = 2, col = "blue")
@@ -204,14 +226,205 @@ legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","N
 
 ```
 
-##c)
+Neither the normal density from a) nor the mixture model from b) seem to capture the distribution of the data well. The mixture model captures the highest peak, but misses the rest of the data, whereas the normal density encapsulates most of the data except the highest peak.
 
 
 #Question 2: Time series models in Stan
 
 ##a)
 
+We simulate data $x_{1:T}$ from the AR(1)-process: $x_t = \mu + \phi(x_{t-1}-\mu)+\epsilon_t$, where $\epsilon_t \overset{iid}{\sim} N(0,\sigma^2)$ with $\mu=10$, $\sigma^2=2$, $x_1=\mu$, $T=200$ and $\phi\in\{-1,1\}$.
+
+```{r}
+#Question 2
+
+library(rstan)
+
+#a)
+
+ar_process = '
+data {
+  int<lower=0> iter;
+  real mu;
+  real<lower=0> sigma2;
+  real<lower=-1, upper=1> phi;
+}
+parameters {
+  real x[iter];
+}
+model {
+  for(i in 2:iter){
+    x[i] ~ normal(mu + phi*(x[i-1]-mu), sqrt(sigma2));
+  }
+}'
+
+burnin <- 101
+niter <- 300
+mu <- 10
+init_para <- list(list(x=c(mu,rep(0,niter-1))))
+#needs to be a list of a list since each chain needs its own list
+fit1<-stan(model_code=ar_process,
+           data=list(iter=niter,sigma2=2, phi=0.5, mu=10),
+           init = init_para,
+           warmup=burnin,
+           iter=niter,
+           chains = 1, 
+           control = list(max_treedepth = 15))
+fit1_postmean <- get_posterior_mean(fit1)[burnin:niter]
+plot(fit1_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0.5")
+axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
+
+fit2<-stan(model_code=ar_process,
+           data=list(iter=niter,sigma2=2, phi=0.9, mu=10),
+           init = init_para,
+           warmup=burnin,
+           iter=niter,
+           chains = 1, 
+           control = list(max_treedepth = 15))
+print(fit2)
+fit2_postmean <- get_posterior_mean(fit2)[burnin:niter]
+plot(fit2_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0.9")
+axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
+
+fit3<-stan(model_code=ar_process,
+           data=list(iter=niter,sigma2=2, phi=-0.9, mu=10),
+           init = init_para,
+           warmup=burnin,
+           iter=niter,
+           chains = 1, 
+           control = list(max_treedepth = 15))
+
+print(fit3)
+fit3_postmean <- get_posterior_mean(fit3)[burnin:niter]
+plot(fit3_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=-0.9")
+axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
+
+fit4<-stan(model_code=ar_process,
+           data=list(iter=niter,sigma2=2, phi=0, mu=10),
+           init = init_para,
+           warmup=burnin,
+           iter=niter,
+           chains = 1, 
+           control = list(max_treedepth = 15))
+print(fit4)
+fit4_postmean <- get_posterior_mean(fit4)[burnin:niter]
+plot(fit4_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0")
+axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
+```
+
+The correlation between $x_t$ and $x_{t+h}$ is $\rho_h=\phi^h$, which means that larger $|\phi|$ gives larger correlation between observations $h$ lags apart.
+
 ##b)
+
+Using the function in a) we simulate two AR(1)-processes $x_{1:T}$ with $\phi=0.3$ and $y_{1:T}$ with $\phi=0.95$. Then we estimate values of $\phi$, $\mu$ and $\sigma^2$ for these two processes using MCMC. The non-informative priors used were 
+
+###i)
+
+```{r}
+#b)
+
+xT <- stan(model_code=ar_process,
+           data=list(iter=niter,sigma2=2, phi=0.3, mu=10),
+           init = init_para,
+           warmup=burnin,
+           iter=niter,
+           chains = 1, 
+           control = list(max_treedepth = 15))
+xT_postmean <- get_posterior_mean(xT)[burnin:niter]
+
+yT <-  stan(model_code=ar_process,
+            data=list(iter=niter,sigma2=2, phi=0.95, mu=10),
+            init = init_para,
+            warmup=burnin,
+            iter=niter,
+            chains = 1, 
+            control = list(max_treedepth = 15))
+yT_postmean <- get_posterior_mean(yT)[burnin:niter]
+
+ar_mcmc = '
+data {
+  int<lower=0> iter;
+  vector[iter] x;
+}
+parameters {
+  real mu;
+  real<lower=0> sigma;
+  real<lower=-1, upper=1> phi;
+}
+model {
+  mu ~ uniform(0,20);
+  sigma ~ uniform(0,5);
+  phi ~ normal(0, 1);
+  for(i in 2:iter){
+    x[i] ~ normal(mu + phi*(x[i-1]-mu), sigma);
+  }
+}'
+
+
+burnin <- 100
+niter <- 300
+ndraws <- 200
+
+xT_fit <- stan(model_code=ar_mcmc,
+           data=list(iter=ndraws,x=xT_postmean),
+           warmup=burnin,
+           iter=niter,
+           chains = 1,
+           seed = 123456,
+           control = list(max_treedepth = 15,adapt_delta = 0.8))
+
+#pairs(xT_fit)
+
+para_postmean <- get_posterior_mean(xT_fit)[burnin:niter]
+mu_post2 <- extract(xT_fit)$mu[burnin:niter]
+phi_post2 <- extract(xT_fit)$phi[burnin:niter]
+sigma2_post2 <- extract(xT_fit)$sigma2[burnin:niter]
+
+perc1x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.025)[1:3]
+perc2x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.975)[1:3]
+n_eff_x <- summary(xT_fit)$summary[,"n_eff"][1:3]
+```
+
+```{r,echo=FALSE}
+cat("Posterior means for mu, sigma2, phi: ", c(mean(mu_post2), mean(sigma2_post2), mean(phi_post2)))
+cat("\n Upper limits for 95% credible interval: ", perc2x)
+cat("\n Lower limits for 95% credible interval: ", perc1x)
+cat("\n Number of effective posterior samples: ", n_eff_x)
+```
+
+```{r, warning=FALSE}
+yT_fit <- stan(model_code=ar_mcmc,
+               data=list(iter=ndraws,x=yT_postmean),
+               warmup=burnin,
+               iter=niter,
+               chains = 1)
+
+Ypara_postmean <- get_posterior_mean(yT_fit)[burnin:niter]
+
+mu_post <- extract(yT_fit)$mu[burnin:niter]
+phi_post <- extract(yT_fit)$phi[burnin:niter]
+sigma2_post <- extract(yT_fit)$sigma2[burnin:niter]
+
+perc1y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.025)[1:3]
+perc2y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.975)[1:3]
+n_eff_y<- summary(yT_fit)$summary[,"n_eff"][1:3]
+```
+
+```{r,echo=FALSE}
+cat("Posterior means for mu, sigma2, phi: ", c(mean(mu_post), mean(sigma2_post), mean(phi_post)))
+cat("\n Upper limits for 95% credible interval: ", perc2y)
+cat("\n Lower limits for 95% credible interval: ", perc1y)
+cat("\n Number of effective posterior samples: ", n_eff_y)
+```
+
+###ii)
+
+```{r}
+plot(mu_post2, phi_post2, pch=19, xlab="mu", ylab="phi", main="Joint posterior of mu and phi for x")
+
+plot(mu_post, phi_post, pch=19, xlab="mu", ylab="phi", main="Joint posterior of mu and phi for y")
+```
+
 
 ##c)
 
