@@ -229,7 +229,7 @@ legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","N
 
 ```
 
-Neither the normal density from a) nor the mixture model from b) seem to capture the distribution of the data well. The mixture model captures the highest peak, but misses the rest of the data, whereas the normal density encapsulates most of the data except the highest peak.
+Neither the normal density from a) nor the mixture model from b) seem to capture the distribution of the data well. The mixture model captures the highest peak better, but misses the rest of the data, whereas the normal density encapsulates most of the data except the highest peak.
 
 
 #Question 2: Time series models in Stan
@@ -238,7 +238,7 @@ Neither the normal density from a) nor the mixture model from b) seem to capture
 
 We simulate data $x_{1:T}$ from the AR(1)-process: $x_t = \mu + \phi(x_{t-1}-\mu)+\epsilon_t$, where $\epsilon_t \overset{iid}{\sim} N(0,\sigma^2)$ with $\mu=10$, $\sigma^2=2$, $x_1=\mu$, $T=200$ and $\phi\in\{-1,1\}$.
 
-```{r}
+```{r,message=FALSE,warning=FALSE}
 #Question 2
 
 library(rstan)
@@ -284,7 +284,7 @@ fit2<-stan(model_code=ar_process,
            iter=niter,
            chains = 1, 
            control = list(max_treedepth = 15))
-print(fit2)
+#print(fit2)
 fit2_postmean <- get_posterior_mean(fit2)[burnin:niter]
 plot(fit2_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0.9")
 axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
@@ -297,7 +297,7 @@ fit3<-stan(model_code=ar_process,
            chains = 1, 
            control = list(max_treedepth = 15))
 
-print(fit3)
+#print(fit3)
 fit3_postmean <- get_posterior_mean(fit3)[burnin:niter]
 plot(fit3_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=-0.9")
 axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
@@ -309,7 +309,7 @@ fit4<-stan(model_code=ar_process,
            iter=niter,
            chains = 1, 
            control = list(max_treedepth = 15))
-print(fit4)
+#print(fit4)
 fit4_postmean <- get_posterior_mean(fit4)[burnin:niter]
 plot(fit4_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0")
 axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
@@ -331,7 +331,7 @@ The priors were chosen so they would cover a wide range of values as well as the
 
 ###i)
 
-```{r, warning=FALSE, error=FALSE}
+```{r,message=FALSE,warning=FALSE, error=FALSE}
 #b)
 
 burnin <- 101
@@ -413,7 +413,7 @@ cat("\n Number of effective posterior samples: ", n_eff_x)
 From the simulations above we get quite close estimates for $\mu$. The estimate for $\sigma^2$ is much lower than the value used in part a). It seems to be highly influenced by the sample variance of the $x_{1:T}$ data, which is `r var(xT_postmean)`. The 95% credible interval of $\phi$ does not include the value of 0.3, hence the estimation of the $\phi$ seems to be poor as well.
 
 
-```{r, warning=FALSE, error=FALSE}
+```{r,message=FALSE,warning=FALSE, error=FALSE}
 yT_fit <- stan(model_code=ar_mcmc,
                data=list(iter=ndraws,x=yT_postmean),
                warmup=burnin,
@@ -490,7 +490,7 @@ $\phi \sim N(0,0.5)$
 \newline
 The priors were chosen so they would cover a wide range of values as well as the values that were used in generating AR(1)-process $x_{1:T}$ data.
 
-```{r}
+```{r,message=FALSE,warning=FALSE}
 campy<-read.table("Campy.dat",header=TRUE)
 
 campy_model = '
@@ -523,7 +523,7 @@ c_fit <- stan(model_code=campy_model,
                      iter=140,
                      chains = 1)
 
-print(c_fit)
+#print(c_fit)
 theta <- exp(get_posterior_mean(c_fit))[4:143]
 perc1 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.025))
 perc2 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.975))
@@ -543,14 +543,14 @@ The posterior mean of $\theta_t$ follows the general trend in the Campy data qui
 
 Now we assume we have a belief that the prior of $\sigma^2$ should be smoother. Therefore, we use a shrinkage constants $\lambda$ to reduce $\epsilon_t$ value for each given time.
 
-```{r}
+```{r,message=FALSE,warning=FALSE}
 d_fit <- stan(model_code=campy_model,
               data=list(iter=140,c=campy$c, lambda=100),
               warmup=30,
               iter=140,
               chains = 1)
 
-print(d_fit)
+#print(d_fit)
 theta2 <- exp(get_posterior_mean(d_fit))[4:143]
 perc1d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.025))
 perc2d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.975))
