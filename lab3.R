@@ -176,5 +176,3 @@ lines(xGrid, dnorm(xGrid, mean = post_mu, sd = sqrt(post_sigma2)), type = "l", l
 legend("topright", box.lty = 1, legend = c("Data histogram","Mixture density","Normal density from a)"), col=c("black","red","blue"), lwd = 2)
 
 #########################    Helper functions    ##############################################
-
-

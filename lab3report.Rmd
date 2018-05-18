@@ -3,7 +3,6 @@ title: "732A91 Lab 3"
 author: "Fanny Karelius (fanka300), Milda Poceviciute (milpo192)"
 date: "3 maj 2018"
 output:
-  pdf_document: default
   html_document: default
 ---
 
@@ -77,7 +76,7 @@ axis(1, at=seq(0,(n-burn_in), by=50), labels=seq(burn_in,n, by=50))
 
 ```
 
-The plots of the trajectories of the sampled Markov chains of $\sigma^2$ and $\mu$ seem to be converging well. The Gibbs sampling takes large steps from iteration to iteration and the values does not appear to be (highly) correlated.
+The plots of the trajectories of the sampled Markov chains of $\sigma^2$ and $\mu$ seem to be converging well. The Gibbs sampling takes large steps from iteration to iteration and the values do not appear to be (highly) correlated.
 
 ##b) Mixture normal model
 
@@ -216,7 +215,7 @@ for(i in 1:nComp){
 }
 ```
 
-From the trajectory plots above we conclude that the $\mu$s and $\sigma^2$s of both components do not appear to converge well. The iterations seem to be correlated.
+From the trajectory plots above we conclude that the $\mu$s and $\sigma^2$s of both components do not appear to converge well. The iterations seem to be very correlated.
 
 
 ##c)
@@ -241,78 +240,33 @@ We simulate data $x_{1:T}$ from the AR(1)-process: $x_t = \mu + \phi(x_{t-1}-\mu
 ```{r,message=FALSE,warning=FALSE}
 #Question 2
 
-library(rstan)
-
 #a)
 
-ar_process = '
-data {
-  int<lower=0> iter;
-  real mu;
-  real<lower=0> sigma2;
-  real<lower=-1, upper=1> phi;
-}
-parameters {
-  real x[iter];
-}
-model {
-  for(i in 2:iter){
-    x[i] ~ normal(mu + phi*(x[i-1]-mu), sqrt(sigma2));
+AR1sim <- function(n,mu,phi,sigma2){
+  x <- vector(length=n)
+  x[1] <- mu
+  for(i in 2:n){
+    epsilon <- rnorm(1, 0, sqrt(sigma2))
+    x[i] <- mu + phi*(x[i-1]-mu) + epsilon
   }
-}'
+  x
+}
 
-burnin <- 101
-niter <- 300
-mu <- 10
-init_para <- list(list(x=c(mu,rep(0,niter-1))))
+#init_para <- list(list(x=c(mu,rep(0,niter-1))))
 #needs to be a list of a list since each chain needs its own list
-fit1<-stan(model_code=ar_process,
-           data=list(iter=niter,sigma2=2, phi=0.5, mu=10),
-           init = init_para,
-           warmup=burnin,
-           iter=niter,
-           chains = 1, 
-           control = list(max_treedepth = 15))
-fit1_postmean <- get_posterior_mean(fit1)[burnin:niter]
-plot(fit1_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0.5")
-axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
+par(mfrow=c(2,2))
+fit1<-AR1sim(n=200,sigma2=2, phi=0.5, mu=10)
+plot(fit1, type="l", xlab="t", ylab="x_t", main="AR(1), phi=0.5")
 
-fit2<-stan(model_code=ar_process,
-           data=list(iter=niter,sigma2=2, phi=0.9, mu=10),
-           init = init_para,
-           warmup=burnin,
-           iter=niter,
-           chains = 1, 
-           control = list(max_treedepth = 15))
-#print(fit2)
-fit2_postmean <- get_posterior_mean(fit2)[burnin:niter]
-plot(fit2_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0.9")
-axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
+fit2<-AR1sim(n=200,sigma2=2, phi=0.9, mu=10)
+plot(fit2, type="l", xlab="t", ylab="x_t", main="AR(1), phi=0.9")
 
-fit3<-stan(model_code=ar_process,
-           data=list(iter=niter,sigma2=2, phi=-0.9, mu=10),
-           init = init_para,
-           warmup=burnin,
-           iter=niter,
-           chains = 1, 
-           control = list(max_treedepth = 15))
+fit3<-AR1sim(n=200,sigma2=2, phi=-0.9, mu=10)
+plot(fit3, type="l", xlab="t", ylab="x_t", main="AR(1), phi=-0.9")
 
-#print(fit3)
-fit3_postmean <- get_posterior_mean(fit3)[burnin:niter]
-plot(fit3_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=-0.9")
-axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
+fit4<-AR1sim(n=200,sigma2=2, phi=0, mu=10)
+plot(fit4, type="l", xlab="t", ylab="x_t", main="AR(1), phi=0")
 
-fit4<-stan(model_code=ar_process,
-           data=list(iter=niter,sigma2=2, phi=0, mu=10),
-           init = init_para,
-           warmup=burnin,
-           iter=niter,
-           chains = 1, 
-           control = list(max_treedepth = 15))
-#print(fit4)
-fit4_postmean <- get_posterior_mean(fit4)[burnin:niter]
-plot(fit4_postmean, type="l", xaxt="n", xlab="Draws", ylab="Posterior mean", main="Posterior mean, phi=0")
-axis(1, at=seq(0,(niter-burnin), by=10), labels=seq(burnin,niter, by=10))
 ```
 
 The correlation between $x_t$ and $x_{t+h}$ is $\rho_h=\phi^h$, which means that larger $|\phi|$ gives larger correlation between observations $h$ lags apart.
@@ -331,31 +285,12 @@ The priors were chosen so they would cover a wide range of values as well as the
 
 ###i)
 
-```{r,message=FALSE,warning=FALSE, error=FALSE}
+```{r,message=FALSE,warning=FALSE, error=FALSE, include=FALSE}
 #b)
+library(rstan)
 
-burnin <- 101
-niter <- 300
-mu <- 10
-init_para <- list(list(x=c(mu,rep(0,niter-1))))
-
-xT <- stan(model_code=ar_process,
-           data=list(iter=niter,sigma2=2, phi=0.3, mu=10),
-           init = init_para,
-           warmup=burnin,
-           iter=niter,
-           chains = 1, 
-           control = list(max_treedepth = 15))
-xT_postmean <- get_posterior_mean(xT)[burnin:niter]
-
-yT <-  stan(model_code=ar_process,
-            data=list(iter=niter,sigma2=2, phi=0.95, mu=10),
-            init = init_para,
-            warmup=burnin,
-            iter=niter,
-            chains = 1, 
-            control = list(max_treedepth = 15))
-yT_postmean <- get_posterior_mean(yT)[burnin:niter]
+xT <- AR1sim(n=200, mu=10, phi=0.3, sigma2=2)
+yT <- AR1sim(n=200, mu=10, phi=0.95, sigma2=2)
 
 ar_mcmc = '
 data {
@@ -384,11 +319,10 @@ niter <- 300
 ndraws <- 200
 
 xT_fit <- stan(model_code=ar_mcmc,
-           data=list(iter=ndraws,x=xT_postmean),
+           data=list(iter=ndraws,x=xT),
            warmup=burnin,
            iter=niter,
-           chains = 1,
-           control = list(max_treedepth = 15,adapt_delta = 0.99))
+           chains = 1)
 
 #pairs(xT_fit)
 
@@ -398,7 +332,9 @@ phi_post2 <- extract(xT_fit)$phi
 sigma2_post2 <- (extract(xT_fit)$sigma)^2
 
 perc1x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.025)[1:3]
+perc1x[2]<-perc1x[2]^2
 perc2x <- sapply(as.data.frame(xT_fit), FUN=quantile, probs=0.975)[1:3]
+perc2x[2]<-perc2x[2]^2
 n_eff_x <- summary(xT_fit)$summary[,"n_eff"][1:3]
 ```
 
@@ -410,12 +346,12 @@ cat("\n Number of effective posterior samples: ", n_eff_x)
 
 ```
 
-From the simulations above we get quite close estimates for $\mu$. The estimate for $\sigma^2$ is much lower than the value used in part a). It seems to be highly influenced by the sample variance of the $x_{1:T}$ data, which is `r var(xT_postmean)`. The 95% credible interval of $\phi$ does not include the value of 0.3, hence the estimation of the $\phi$ seems to be poor as well.
+From the simulations above we get quite close estimates for $\mu$. The estimate for $\sigma^2$ is higher than the value used in part a). It seems to be highly influenced by the sample variance of the $x_{1:T}$ data, which is `r var(xT)`. The 95% credible interval of $\phi$ includes the value of 0.3, but the mean is low.
 
 
-```{r,message=FALSE,warning=FALSE, error=FALSE}
+```{r,message=FALSE,warning=FALSE, error=FALSE, include=FALSE}
 yT_fit <- stan(model_code=ar_mcmc,
-               data=list(iter=ndraws,x=yT_postmean),
+               data=list(iter=ndraws,x=yT),
                warmup=burnin,
                iter=niter,
                chains = 1)
@@ -427,7 +363,9 @@ phi_post <- extract(yT_fit)$phi
 sigma2_post <- (extract(yT_fit)$sigma)^2
 
 perc1y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.025)[1:3]
+perc1y[2]<-perc1y[2]^2
 perc2y <- sapply(as.data.frame(yT_fit), FUN=quantile, probs=0.975)[1:3]
+perc2y[2]<-perc2y[2]^2
 n_eff_y<- summary(yT_fit)$summary[,"n_eff"][1:3]
 ```
 
@@ -438,13 +376,14 @@ cat("\n Lower limits for 95% credible interval: ", perc1y)
 cat("\n Number of effective posterior samples: ", n_eff_y)
 ```
 
-From the simulations above we get quite close estimates for $\mu$ and $\phi$. However,the estimate for $\sigma^2$ is much lower than the value used in part a). It seems to be highly influenced by the sample variance of the $y_{1:T}$ data, which is `r var(yT_postmean)`.
+From the simulations above we get quite close estimates for $\mu$, but the credibility interval is very wide. However, the estimate for $\sigma^2$ is higher than the value used in part a). The estimate of $\phi$ is close to the actual value and the credibility interval is quite narrow. 
  
 
 ###ii)
 
 ```{r}
 # Trajectory plots of the mu 
+
 plot(mu_post2, type='l')
 
 plot(mu_post, type='l')
@@ -490,7 +429,7 @@ $\phi \sim N(0,0.5)$
 \newline
 The priors were chosen so they would cover a wide range of values as well as the values that were used in generating AR(1)-process $x_{1:T}$ data.
 
-```{r,message=FALSE,warning=FALSE}
+```{r,message=FALSE,warning=FALSE, include=FALSE}
 campy<-read.table("Campy.dat",header=TRUE)
 
 campy_model = '
@@ -508,10 +447,10 @@ parameters {
 
 model {
   phi ~ normal(0,0.5);
-  sigma ~ exponential(1);
+  sigma ~ exponential(lambda);
   mu ~ normal(0,10);
   for(i in 2:iter){
-    x[i] ~ normal(mu + phi*(x[i-1]-mu), sigma/lambda);
+    x[i] ~ normal(mu + phi*(x[i-1]-mu), sigma);
     c[i] ~ poisson(exp(x[i]));
   }
     
@@ -527,6 +466,8 @@ c_fit <- stan(model_code=campy_model,
 theta <- exp(get_posterior_mean(c_fit))[4:143]
 perc1 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.025))
 perc2 <- exp(sapply(as.data.frame(c_fit)[,4:143], FUN=quantile, probs=0.975))
+```
+```{r, echo=FALSE}
 plot(theta, type="l", main="Campy c)")
 lines(campy$c, col="red")
 lines(perc1, col="blue")
@@ -541,9 +482,9 @@ The posterior mean of $\theta_t$ follows the general trend in the Campy data qui
 
 ##d)
 
-Now we assume we have a belief that the prior of $\sigma^2$ should be smoother. Therefore, we use a shrinkage constants $\lambda$ to reduce $\epsilon_t$ value for each given time.
+Now we assume we have a belief that the prior of $\sigma^2$ should be smoother. Therefore, we use a shrinkage constant $\lambda$ to reduce $\epsilon_t$ value for each given time.
 
-```{r,message=FALSE,warning=FALSE}
+```{r,message=FALSE,warning=FALSE, include=FALSE}
 d_fit <- stan(model_code=campy_model,
               data=list(iter=140,c=campy$c, lambda=100),
               warmup=30,
@@ -554,6 +495,9 @@ d_fit <- stan(model_code=campy_model,
 theta2 <- exp(get_posterior_mean(d_fit))[4:143]
 perc1d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.025))
 perc2d <- exp(sapply(as.data.frame(d_fit)[,4:143], FUN=quantile, probs=0.975))
+```
+
+```{r, echo=FALSE}
 plot(theta2, type="l", main="Campy d)")
 lines(campy$c, col="red")
 lines(perc1d, col="blue")
@@ -568,7 +512,7 @@ legend(x = 5, y=45, c("Theta c)", "Theta d)"), col=c("black", "red"), lwd = 3)
 
 ```
 
-The posterior mean of $\theta_t$ in part d) does seem to be a bit smoother with shrinkage constant $\lambda = 100$, but the overall performance is a bit worse. That is, the 95% credible interval includes less values of the Campy data in comparison to part c).
+The posterior mean of $\theta_t$ in part d) does seem to be a bit smoother with prior $\sigma\sim\exp(\lambda = 100)$. The model in c) might be a better fit since it includes more data in the 95% credible interval than the 95% credible interval in d).
 
 #Appendix
 ```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
